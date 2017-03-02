@@ -1,0 +1,5 @@
+Kernel-Module template 
+
+build info:
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- KDIR=/home/$USER/raspberrypi/linux/
+
