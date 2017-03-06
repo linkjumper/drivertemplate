@@ -2,35 +2,63 @@
 #include <linux/fs.h>
 #include <linux/cdev.h>
 #include <linux/device.h>
-/*#include <linux/init.h>*/
-#include <asm/uaccess.h> /* copy_to_user() */
-/*#include <linux/kernel.h> */
+#include <asm/atomic.h>
+#include <asm/uaccess.h> /*copy_to_user() */
+/*#include <linux/sched.h>*/
+#include <linux/wait.h> /*wait_queues*/
 
+#include <linux/random.h> /*get_random_bytes*/
+
+
+
+
+#define MEMBUF		128
+#define ATOMICBUF	13
 #define MODULNAME "template"
 
-static char str[] = "Hello World\n";
+static char *Version = "$Id: mod.c, V0.0 2017-03-06 linkjumper $";
+/*static char str[] = "Hello World\n";*/
 
 static dev_t		 template_dev_number;
 static struct cdev	*driver_object;
 static struct class	*template_class;
 static struct device	*template_dev;
+static wait_queue_head_t wq_read/*, wq_write*/;
 
-static int driver_open( struct inode *device_file, struct file *entity){
+/*static atomic_t bytes_that_can_be_written = ATOMIC_INIT(0);*/
+static atomic_t bytes_available = ATOMIC_INIT(ATOMICBUF); /*todo*/
+#define READ_POSSIBLE (atomic_read(&bytes_available)!=0)
+/*#define WRITE_POSSIBLE (atomic_read(&bytes_that_can_be_written)!=0)*/
+
+
+
+static int driver_open(struct inode *device_file, struct file *instance){
 	dev_info(template_dev, "driver_open called\n");
 	return 0;
 }
 
-static int driver_close( struct inode *device_file, struct file *entity){
+static int driver_close(struct inode *device_file, struct file *instance){
 	dev_info(template_dev, "driver_close called\n");
 	return 0;
 }
 
-static ssize_t driver_read(struct file *entity, char __user *user,
-	size_t count, loff_t *offset){
-	unsigned long not_copied, to_copy;
+static ssize_t driver_read(struct file *instance, char __user *buffer,
+	size_t max_bytes_to_read, loff_t *offset){
+	
+	size_t not_copied, to_copy;
+	
+	static char kernelmem[MEMBUF]; /*todo: spinlocks*/
 
-	to_copy = min(count, strlen(str)+1);
-	not_copied = copy_to_user(user, str, to_copy);
+	get_random_bytes(kernelmem,MEMBUF);
+	dev_info(template_dev,"%.*s\n",MEMBUF,kernelmem);
+
+	if(!READ_POSSIBLE && (instance->f_flags&O_NONBLOCK))
+		return -EAGAIN; /*Nonblocking-mode & no data available*/
+	if(wait_event_interruptible(wq_read, READ_POSSIBLE))
+		return -ERESTARTSYS; /*Signal interrupt sleeping*/
+	to_copy = min((size_t)atomic_read(&bytes_available), max_bytes_to_read);
+	not_copied = copy_to_user(buffer, kernelmem, to_copy);
+	/*atomic_sub(to_copy-not_copied, &bytes_available);*/
 	*offset += to_copy-not_copied;
 	return to_copy-not_copied;
 }
@@ -43,6 +71,8 @@ static struct file_operations fops={
 };
 
 static int __init template_init(void){
+	init_waitqueue_head(&wq_read);
+/*	init_waitqueue_head(&wq_write);*/
 	if(alloc_chrdev_region(&template_dev_number,0,1,MODULNAME)<0)
 		return -EIO;
 	driver_object = cdev_alloc();
@@ -63,6 +93,7 @@ static int __init template_init(void){
 		pr_err("template: device_create() failed\n");
 		goto free_class;
 	}
+	dev_info(template_dev, "%s\n", Version);
 	return 0;
 free_class:
 	class_destroy(template_class);
