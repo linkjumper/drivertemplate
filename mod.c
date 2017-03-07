@@ -3,27 +3,30 @@
 #include <linux/cdev.h>
 #include <linux/device.h>
 #include <asm/atomic.h>
-#include <asm/uaccess.h> /*copy_to_user() */
-#include <linux/wait.h> /*wait_queues*/
+#include <asm/uaccess.h>  /*copy_to_user()*/
+#include <linux/wait.h>   /*wait_queues*/
 #include <linux/random.h> /*get_random_bytes*/
 
 #define MEMBUF		128
-#define ATOMICBUF	13
+#define ATOMIC_BUF	10	
 #define MODULNAME	"template"
-#define VERSION_NR	"V0.1"
+#define VERSION_NR	"V0.2"
+#define RELEASE_DATE	"2017-03-07"
 #define AUTHOR		"linkjumper"
-#define VERSION 	"Id: mod.c, " VERSION_NR " 2017-03-06 " AUTHOR 
+#define VERSION 	"Id: mod.c, " VERSION_NR " " RELEASE_DATE " " AUTHOR 
 
 static dev_t		 template_dev_number;
 static struct cdev	*driver_object;
 static struct class	*template_class;
 static struct device	*template_dev;
-static wait_queue_head_t wq_read/*, wq_write*/;
+static wait_queue_head_t wq_read, wq_write;
 
-/*static atomic_t bytes_that_can_be_written = ATOMIC_INIT(0);*/
-static atomic_t bytes_available = ATOMIC_INIT(ATOMICBUF); /*todo*/
-#define READ_POSSIBLE (atomic_read(&bytes_available)!=0)
-/*#define WRITE_POSSIBLE (atomic_read(&bytes_that_can_be_written)!=0)*/
+static atomic_t bytes_that_can_be_written = ATOMIC_INIT(0); /*todo*/
+static atomic_t bytes_available           = ATOMIC_INIT(0); /*todo*/
+#define READ_POSSIBLE  (atomic_read(&bytes_available)!=0)
+#define WRITE_POSSIBLE (atomic_read(&bytes_that_can_be_written)!=0)
+
+static char kernelmem[MEMBUF];
 
 static int driver_open(struct inode *device_file, struct file *instance){
 	dev_info(template_dev, "driver_open called\n");
@@ -39,10 +42,9 @@ static ssize_t driver_read(struct file *instance, char __user *buffer,
 	size_t max_bytes_to_read, loff_t *offset){
 	
 	size_t not_copied, to_copy;
-	static char kernelmem[MEMBUF]; /*todo: spinlocks*/
 
 	/*todo: fill kernelmem with any data & edit bytes_available */
-	get_random_bytes(kernelmem,MEMBUF);
+	/*get_random_bytes(kernelmem,MEMBUF);*/
 	/*dev_info(template_dev,"%.*s\n",MEMBUF,kernelmem);*/
 
 	if(!READ_POSSIBLE && (instance->f_flags&O_NONBLOCK))
@@ -51,7 +53,40 @@ static ssize_t driver_read(struct file *instance, char __user *buffer,
 		return -ERESTARTSYS; /*Signal interrupt sleeping*/
 	to_copy = min((size_t)atomic_read(&bytes_available), max_bytes_to_read);
 	not_copied = copy_to_user(buffer, kernelmem, to_copy);
+#if 0
+	dev_info(template_dev,"Sent:%d characters to the user\n",
+		atomic_read(&bytes_available));
+	dev_info(template_dev,"buffer:%s\n",buffer);
+	dev_info(template_dev,"kernelmem:%s\n",kernelmem);
+	dev_info(template_dev,"bytes_available:%d\n",atomic_read(&bytes_available));
+	dev_info(template_dev,"*offset:%d\n", (int)*offset);
+	dev_info(template_dev,"to_copy:%d\n",to_copy);
+	dev_info(template_dev,"not_copied:%d\n",not_copied);
+#endif
 	atomic_sub(to_copy-not_copied, &bytes_available);
+	*offset += to_copy-not_copied;
+	return to_copy-not_copied;
+}
+
+static ssize_t driver_write(struct file *instance, const char __user *buffer,
+	size_t max_bytes_to_write, loff_t *offset){
+	
+	size_t not_copied, to_copy;
+
+	if(!WRITE_POSSIBLE && (instance->f_flags&O_NONBLOCK))
+		return -EAGAIN; /*Nonblocking-mode & not ready to write data*/
+	if(wait_event_interruptible(wq_write, WRITE_POSSIBLE))
+		return -ERESTARTSYS; /*Signal interrupt stopps sleeping*/
+	to_copy = min((size_t)atomic_read(&bytes_that_can_be_written),
+		 max_bytes_to_write);
+	not_copied = copy_from_user(kernelmem, buffer, to_copy);
+
+	/*todo write kernelmem to hardware*/
+	dev_info(template_dev,"Received:%d characters from the user\n",max_bytes_to_write);
+	atomic_sub(to_copy-not_copied, &bytes_that_can_be_written);
+#if 0
+	atomic_set(&bytes_available, atomic_read(&bytes_that_can_be_written));
+#endif
 	*offset += to_copy-not_copied;
 	return to_copy-not_copied;
 }
@@ -59,13 +94,14 @@ static ssize_t driver_read(struct file *instance, char __user *buffer,
 static struct file_operations fops={
 	.owner   = THIS_MODULE,
 	.read    = driver_read,
+	.write	 = driver_write,
 	.open    = driver_open,
 	.release = driver_close,
 };
 
 static int __init template_init(void){
 	init_waitqueue_head(&wq_read);
-/*	init_waitqueue_head(&wq_write);*/
+	init_waitqueue_head(&wq_write);
 	if(alloc_chrdev_region(&template_dev_number,0,1,MODULNAME)<0)
 		return -EIO;
 	driver_object = cdev_alloc();
@@ -98,6 +134,7 @@ free_device_number:
 }
 
 static void __exit template_exit(void){
+	dev_info(template_dev, "exit\n");
 	device_destroy(template_class, template_dev_number);
 	class_destroy(template_class);
 	cdev_del(driver_object);
