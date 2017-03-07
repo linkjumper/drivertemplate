@@ -8,3 +8,5 @@ Module.symvers
 *.mod.c
 *.mod.o
 *.mod.o.cmd
+
+application.c
