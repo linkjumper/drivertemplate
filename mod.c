@@ -13,7 +13,8 @@
 #define VERSION_NR	"V0.2"
 #define RELEASE_DATE	"2017-03-07"
 #define AUTHOR		"linkjumper"
-#define VERSION 	"Id: mod.c, " VERSION_NR " " RELEASE_DATE " " AUTHOR 
+#define FILENAME	"mod.c"
+#define VERSION 	"Id:"FILENAME" "VERSION_NR" "RELEASE_DATE" "AUTHOR 
 
 static dev_t		 template_dev_number;
 static struct cdev	*driver_object;
@@ -21,8 +22,8 @@ static struct class	*template_class;
 static struct device	*template_dev;
 static wait_queue_head_t wq_read, wq_write;
 
-static atomic_t bytes_that_can_be_written = ATOMIC_INIT(0); /*todo*/
-static atomic_t bytes_available           = ATOMIC_INIT(0); /*todo*/
+static atomic_t bytes_that_can_be_written = ATOMIC_INIT(20); /*todo*/
+static atomic_t bytes_available           = ATOMIC_INIT(0);  /*todo*/
 #define READ_POSSIBLE  (atomic_read(&bytes_available)!=0)
 #define WRITE_POSSIBLE (atomic_read(&bytes_that_can_be_written)!=0)
 
@@ -44,8 +45,6 @@ static ssize_t driver_read(struct file *instance, char __user *buffer,
 	size_t not_copied, to_copy;
 
 	/*todo: fill kernelmem with any data & edit bytes_available */
-	/*get_random_bytes(kernelmem,MEMBUF);*/
-	/*dev_info(template_dev,"%.*s\n",MEMBUF,kernelmem);*/
 
 	if(!READ_POSSIBLE && (instance->f_flags&O_NONBLOCK))
 		return -EAGAIN; /*Nonblocking-mode & no data available*/
@@ -53,16 +52,6 @@ static ssize_t driver_read(struct file *instance, char __user *buffer,
 		return -ERESTARTSYS; /*Signal interrupt sleeping*/
 	to_copy = min((size_t)atomic_read(&bytes_available), max_bytes_to_read);
 	not_copied = copy_to_user(buffer, kernelmem, to_copy);
-#if 0
-	dev_info(template_dev,"Sent:%d characters to the user\n",
-		atomic_read(&bytes_available));
-	dev_info(template_dev,"buffer:%s\n",buffer);
-	dev_info(template_dev,"kernelmem:%s\n",kernelmem);
-	dev_info(template_dev,"bytes_available:%d\n",atomic_read(&bytes_available));
-	dev_info(template_dev,"*offset:%d\n", (int)*offset);
-	dev_info(template_dev,"to_copy:%d\n",to_copy);
-	dev_info(template_dev,"not_copied:%d\n",not_copied);
-#endif
 	atomic_sub(to_copy-not_copied, &bytes_available);
 	*offset += to_copy-not_copied;
 	return to_copy-not_copied;
@@ -83,10 +72,13 @@ static ssize_t driver_write(struct file *instance, const char __user *buffer,
 
 	/*todo write kernelmem to hardware*/
 	dev_info(template_dev,"Received:%d characters from the user\n",max_bytes_to_write);
-	atomic_sub(to_copy-not_copied, &bytes_that_can_be_written);
-#if 0
-	atomic_set(&bytes_available, atomic_read(&bytes_that_can_be_written));
-#endif
+
+/*##### MODIFY THIS #####*/
+/*	atomic_sub(to_copy-not_copied, &bytes_that_can_be_written); */
+	atomic_set(&bytes_available, strlen(kernelmem)+1);
+	wake_up_interruptible(&wq_read);
+/*######################*/
+	
 	*offset += to_copy-not_copied;
 	return to_copy-not_copied;
 }

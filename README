@@ -3,3 +3,9 @@ Kernel-Module template
 build info:
 make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- KDIR=/home/$USER/raspberrypi/linux/
 
+working example:
+sudo insmod mod.ko
+cat /dev/template
+
+new tab:
+echo "whatever you wanna write" > /dev/template
