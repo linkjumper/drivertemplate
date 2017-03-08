@@ -10,8 +10,8 @@
 #define MEMBUF		128
 #define ATOMIC_BUF	10	
 #define MODULNAME	"template"
-#define VERSION_NR	"V0.2"
-#define RELEASE_DATE	"2017-03-07"
+#define VERSION_NR	"V0.3"
+#define RELEASE_DATE	"2017-03-08"
 #define AUTHOR		"linkjumper"
 #define FILENAME	"mod.c"
 #define VERSION 	"Id:"FILENAME" "VERSION_NR" "RELEASE_DATE" "AUTHOR 
@@ -28,13 +28,18 @@ static atomic_t bytes_available           = ATOMIC_INIT(0);  /*todo*/
 #define WRITE_POSSIBLE (atomic_read(&bytes_that_can_be_written)!=0)
 
 static char kernelmem[MEMBUF];
+static int usecount;
 
 static int driver_open(struct inode *device_file, struct file *instance){
+	if(usecount)
+    		return -EBUSY;
+	usecount++;
 	dev_info(template_dev, "driver_open called\n");
 	return 0;
 }
 
 static int driver_close(struct inode *device_file, struct file *instance){
+	usecount--;
 	dev_info(template_dev, "driver_close called\n");
 	return 0;
 }
@@ -92,6 +97,7 @@ static struct file_operations fops={
 };
 
 static int __init template_init(void){
+	usecount = 0;
 	init_waitqueue_head(&wq_read);
 	init_waitqueue_head(&wq_write);
 	if(alloc_chrdev_region(&template_dev_number,0,1,MODULNAME)<0)
