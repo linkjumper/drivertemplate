@@ -1,5 +1,5 @@
 do not forget to open application, using "sudo" 
--> open("/dev/myioctl",O_RDWD);:wq
+-> open("/dev/myioctl",O_RDWD);
 
 build:
 gcc -o appio -Wall ioapplication.c

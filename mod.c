@@ -5,13 +5,15 @@
 #include <asm/atomic.h>
 #include <asm/uaccess.h>  /*copy_to_user()*/
 #include <linux/wait.h>   /*wait_queues*/
+#include <linux/poll.h>	  /*poll_wait()*/
+
 #include <linux/random.h> /*get_random_bytes*/
 
 #define MEMBUF		128
-#define ATOMIC_BUF	10	
+#define ATOMIC_BUF	20	
 #define MODULNAME	"template"
-#define VERSION_NR	"V0.3"
-#define RELEASE_DATE	"2017-03-08"
+#define VERSION_NR	"V0.4"
+#define RELEASE_DATE	"2017-03-09"
 #define AUTHOR		"linkjumper"
 #define FILENAME	"mod.c"
 #define VERSION 	"Id:"FILENAME" "VERSION_NR" "RELEASE_DATE" "AUTHOR 
@@ -22,7 +24,7 @@ static struct class	*template_class;
 static struct device	*template_dev;
 static wait_queue_head_t wq_read, wq_write;
 
-static atomic_t bytes_that_can_be_written = ATOMIC_INIT(20); /*todo*/
+static atomic_t bytes_that_can_be_written = ATOMIC_INIT(ATOMIC_BUF); /*todo*/
 static atomic_t bytes_available           = ATOMIC_INIT(0);  /*todo*/
 #define READ_POSSIBLE  (atomic_read(&bytes_available)!=0)
 #define WRITE_POSSIBLE (atomic_read(&bytes_that_can_be_written)!=0)
@@ -88,12 +90,25 @@ static ssize_t driver_write(struct file *instance, const char __user *buffer,
 	return to_copy-not_copied;
 }
 
+unsigned int driver_poll(struct file *instance,
+	struct poll_table_struct *event_list){
+	unsigned int mask = 0;
+	poll_wait(instance, &wq_read, event_list);
+	poll_wait(instance, &wq_write, event_list);
+	if(READ_POSSIBLE)
+		mask |= POLLIN | POLLRDNORM;
+	if(WRITE_POSSIBLE)
+		mask |= POLLOUT | POLLWRNORM;
+	return mask;
+}
+
 static struct file_operations fops={
 	.owner   = THIS_MODULE,
 	.read    = driver_read,
 	.write	 = driver_write,
 	.open    = driver_open,
 	.release = driver_close,
+	.poll    = driver_poll
 };
 
 static int __init template_init(void){
@@ -120,7 +135,7 @@ static int __init template_init(void){
 		pr_err("template: device_create() failed\n");
 		goto free_class;
 	}
-	dev_info(template_dev, "%s\n", VERSION);
+	dev_info(template_dev, "__init: %s\n", VERSION);
 	return 0;
 free_class:
 	class_destroy(template_class);
@@ -132,7 +147,7 @@ free_device_number:
 }
 
 static void __exit template_exit(void){
-	dev_info(template_dev, "exit\n");
+	dev_info(template_dev, "__exit\n");
 	device_destroy(template_class, template_dev_number);
 	class_destroy(template_class);
 	cdev_del(driver_object);
