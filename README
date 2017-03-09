@@ -1,5 +1,8 @@
 Kernel-Module template
 
+#2017-03-08 add ioctl example (seperate folder)
+#2017-03-07 add working example for template driver module
+
 build info:
 make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- KDIR=/home/$USER/raspberrypi/linux/
 

@@ -1,5 +1,6 @@
 ifneq ($(KERNELRELEASE),)
 	obj-m	:= mod.o
+	#obj-m	:= ioctl.o
 
 else
 	KDIR	:= /lib/modules/$(shell uname -r)/build

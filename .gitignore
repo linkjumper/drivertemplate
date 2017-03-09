@@ -9,4 +9,4 @@ Module.symvers
 *.mod.o
 *.mod.o.cmd
 
-application.c
+copy.sh

@@ -1,0 +1,8 @@
+do not forget to open application, using "sudo" 
+-> open("/dev/myioctl",O_RDWD);:wq
+
+build:
+gcc -o appio -Wall ioapplication.c
+
+build module:
+-> change ioctl.o in Makefile
