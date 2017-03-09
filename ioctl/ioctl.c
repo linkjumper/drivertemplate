@@ -26,7 +26,7 @@ static long driver_ioctl(struct file *instance, unsigned int cmd, unsigned long 
 	}
 	return 0;
 }
-
+/*
 static int driver_open(struct inode *device_file, struct file *instance){
         dev_info(ioctl_dev, "ioctl_open\n");
         return 0;
@@ -36,11 +36,12 @@ static int driver_close(struct inode *device_file, struct file *instance){
         dev_info(ioctl_dev, "ioctl_close\n");
         return 0;
 }
-
+*/
 static struct file_operations ioctl_fops = {
-	.open = driver_open,
-	.release = driver_close,
+	/*.open = driver_open,
+	.release = driver_close,*/
 	.owner= THIS_MODULE,
+	/*.compat_ioctl=driver_ioctl does not work*/
 	.unlocked_ioctl=driver_ioctl
 };
 
