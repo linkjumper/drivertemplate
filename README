@@ -1,5 +1,7 @@
 Kernel-Module template
 
+#2017-03-16 add proc file example
+#2017-03-14 add irq examples 
 #2017-03-08 add ioctl example (seperate folder)
 #2017-03-07 add working example for template driver module
 

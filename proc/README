@@ -1,0 +1,5 @@
+# as super user
+
+cat /proc/Hello_World
+echo "deutsch" >/proc/Hello_World
+echo "english" >/proc/Hello_World
