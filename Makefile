@@ -1,5 +1,6 @@
 ifneq ($(KERNELRELEASE),)
-	obj-m	:= mod.o
+#	obj-m	:= mod.o
+	obj-m	:= devicedriver.o
 #	obj-m	:= ioctl.o
 #	obj-m	:= irq.o
 #	obj-m	:= threaded_irq.o	
