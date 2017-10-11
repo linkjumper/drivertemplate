@@ -1,0 +1,8 @@
+#compile driver
+# modify ~/.bashrc
+# PATH=$PATH:/<path-to-toolchain>/gcc-linaro-arm-linux-gnueabihf-raspbian/bin
+# start with environmentvar export ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+make KDIR=<linux src dir> M=<source folder>
+
+#compile io-app
+arm-linux-gnueabihf-gcc -Wall ioapplication.c -o appio
